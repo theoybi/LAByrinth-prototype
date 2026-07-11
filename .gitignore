@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments and local settings
+.venv/
+venv/
+.env
+
+# Editors and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Input data and generated results
+data/input/
+outputs/
+
+# Model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Logs
+*.log

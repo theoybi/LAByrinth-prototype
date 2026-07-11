@@ -1,0 +1,7 @@
+torch
+torchvision
+transformers>=4.56.1
+accelerate
+pillow
+numpy
+opencv-python
