@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # Keep this before importing Transformers-backed helper files.
-from reporting_utils import configure_quiet_environment
+from pipeline.reporting_utils import configure_quiet_environment
 
 configure_quiet_environment()
 
@@ -12,9 +12,9 @@ from typing import Any, Dict, List
 
 from PIL import Image
 
-from batch_utils import ProgressBar, find_images
+from pipeline.batch_utils import ProgressBar, find_images
 from criteria import load_criteria_pack
-from grounding_dino_utils import (
+from pipeline.grounding_dino_utils import (
     get_best_detection,
     get_device,
     load_grounding_dino,
@@ -22,9 +22,9 @@ from grounding_dino_utils import (
     save_all_detections_image,
     save_detection_image,
 )
-from reporting_utils import RunReport, quiet_stdout_stderr, write_json
-from sam2_utils import load_sam2, run_sam2_with_box, save_mask, save_mask_overlay
-from visualization_utils import save_detection_overview, save_mask_overview
+from pipeline.reporting_utils import RunReport, quiet_stdout_stderr, write_json
+from pipeline.sam2_utils import load_sam2, run_sam2_with_box, save_mask, save_mask_overlay
+from pipeline.visualization_utils import save_detection_overview, save_mask_overview
 
 
 # Main switch: change this one variable to run a different criteria pack.
