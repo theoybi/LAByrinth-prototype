@@ -1,0 +1,6 @@
+Data Framwork:
+    What information to keep (should trainee's annotation be kept for model training?) 
+
+Latency problem:
+    10-30 seconds ideally
+    

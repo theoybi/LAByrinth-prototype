@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polygon Lab</title>
+<style>
+  :root {
+    --bg: #FBFAF8;
+    --panel: #FFFFFF;
+    --ink: #1F1D1A;
+    --muted: #6B645B;
+    --rule: #E1DBD1;
+    --accent: #A6472F;
+    --accent-soft: #F5E6E1;
+    --ok: #2F7D5E;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191817;  --panel: #232120; --ink: #EDE9E3; --muted: #9F968A;
+      --rule: #383433; --accent: #E08163; --accent-soft: #3A2622; --ok: #6FBF97;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--ui); font-size: 14px; line-height: 1.5;
+  }
+
+  header {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--rule); background: var(--panel);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  header p { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+  .layout {
+    display: grid; grid-template-columns: minmax(0,1fr) 320px 400px;
+    gap: 16px; padding: 16px 20px 40px; align-items: start;
+  }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+
+  .card { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; }
+  .card > h2 {
+    margin: 0; padding: 10px 14px; font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--rule);
+  }
+  .card > .body { padding: 14px; }
+
+  /* ---- drawing surface ---- */
+  #stage { position: relative; line-height: 0; touch-action: none; }
+  #stage img { width: 100%; height: auto; display: block; user-select: none; -webkit-user-drag: none; }
+  #overlay { position: absolute; inset: 0; cursor: crosshair; }
+  #overlay.idle { cursor: default; }
+  .vert { cursor: grab; }
+  .vert:active { cursor: grabbing; }
+
+  /* ---- controls ---- */
+  label.f { display: block; font-size: 11px; text-transform: uppercase;
+            letter-spacing: 0.08em; color: var(--muted); margin: 0 0 4px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .row + .field, .field + .field { margin-top: 14px; }
+
+  select, input[type=text], textarea {
+    width: 100%; font: inherit; font-size: 13px; padding: 7px 9px;
+    border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--bg); color: var(--ink);
+  }
+  textarea { resize: vertical; min-height: 54px; }
+
+  button {
+    font: inherit; font-size: 13px; padding: 6px 11px; border-radius: 3px;
+    border: 1px solid var(--rule); background: var(--bg); color: var(--ink); cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.on { background: var(--ink); color: var(--panel); border-color: var(--ink); }
+  button.danger { color: var(--accent); border-color: var(--accent); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .hint { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+  kbd {
+    font-family: var(--mono); font-size: 11px; padding: 1px 5px;
+    border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 3px;
+  }
+
+  /* ---- region list ---- */
+  ul#list { list-style: none; margin: 0; padding: 0; }
+  ul#list li {
+    display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+    border-bottom: 1px solid var(--rule); cursor: pointer; font-size: 13px;
+  }
+  ul#list li:hover { background: var(--accent-soft); }
+  ul#list li.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  .kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-left: auto; }
+  .empty { padding: 14px; color: var(--muted); font-size: 13px; }
+
+  /* ---- output ---- */
+  .tabs { display: flex; border-bottom: 1px solid var(--rule); }
+  .tabs button {
+    border: 0; border-radius: 0; background: none; padding: 9px 12px;
+    font-size: 12px; color: var(--muted); border-bottom: 2px solid transparent;
+  }
+  .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); background: none; }
+  pre {
+    margin: 0; padding: 14px; font-family: var(--mono); font-size: 11.5px;
+    line-height: 1.55; overflow: auto; max-height: 460px; white-space: pre;
+  }
+  .outfoot {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; border-top: 1px solid var(--rule);
+  }
+  .outfoot span { font-size: 12px; color: var(--muted); }
+  .saidok { color: var(--ok) !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Polygon Lab</h1>
+  <p>Draw regions the way the workbench does, and watch both export formats update live.</p>
+</header>
+
+<div class="layout">
+
+  <!-- ============ drawing ============ -->
+  <div class="card">
+    <h2>Canvas</h2>
+    <div id="stage">
+      <img id="photo" alt="Annotation target">
+      <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="body" style="border-top:1px solid var(--rule)">
+      <div class="row">
+        <button id="tool-poly" class="on">Outline</button>
+        <button id="tool-rect">Box</button>
+        <button id="finish" disabled>Finish shape</button>
+        <button id="undo">Undo point</button>
+        <button id="del" class="danger" disabled>Delete region</button>
+        <button id="clear" class="danger">Clear all</button>
+        <label for="file" style="margin-left:auto">
+          <input id="file" type="file" accept="image/*" style="display:none">
+          <span role="button" tabindex="0" style="display:inline-block;padding:6px 11px;border:1px solid var(--rule);border-radius:3px;cursor:pointer;font-size:13px">Load image…</span>
+        </label>
+      </div>
+      <p class="hint">
+        Pick a structure first, then click to place points. <kbd>Enter</kbd> or double-click closes an
+        outline, <kbd>Esc</kbd> cancels it. Drag a corner handle to move a point. Click a shape to select it.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============ label ============ -->
+  <div class="card">
+    <h2>Label</h2>
+    <div class="body">
+      <div class="field">
+        <label class="f" for="structure">Structure</label>
+        <select id="structure"></select>
+      </div>
+      <div class="field">
+        <label class="f" for="newstruct">Add a structure</label>
+        <div class="row">
+          <input id="newstruct" type="text" placeholder="e.g. Malleus" style="flex:1">
+          <button id="addstruct">Add</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="f">Mark as</label>
+        <div class="row">
+          <button class="kindbtn on" data-kind="CORRECT">Correct</button>
+          <button class="kindbtn" data-kind="ERROR">Error</button>
+          <button class="kindbtn" data-kind="GUIDANCE">Guidance</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="f" for="note">Note on selected region</label>
+        <textarea id="note" placeholder="Select a region to add a teaching note…" disabled></textarea>
+      </div>
+    </div>
+    <h2 style="border-top:1px solid var(--rule)">Regions</h2>
+    <ul id="list"></ul>
+  </div>
+
+  <!-- ============ output ============ -->
+  <div class="card">
+    <h2>Output</h2>
+    <div class="tabs">
+      <button data-tab="lab" class="on">LAByrinth</button>
+      <button data-tab="ls">Label Studio task</button>
+      <button data-tab="cfg">LS labeling config</button>
+    </div>
+    <pre id="out"></pre>
+    <div class="outfoot">
+      <button id="copy">Copy</button>
+      <button id="import">Paste LAByrinth JSON…</button>
+      <span id="msg"></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   Polygon Lab
+
+   A standalone sandbox for the two things that matter in the annotation
+   pipeline:
+
+     1. drawing regions the way annotation-workbench.tsx does
+     2. converting them to and from the format Label Studio wants
+
+   Everything is in this one file. No server, no build step, no network.
+   Edit it, hit refresh, see what changed.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   The structure vocabulary.
+
+   In the real app this comes from the AnatomicalStructure table, which is
+   exactly the seeding question: these names and colors would be generated
+   from the curriculum instead of typed here.
+   --------------------------------------------------------------------- */
+const PALETTE = ["#ef4444","#3b82f6","#22c55e","#f59e0b","#a855f7",
+                 "#ec4899","#14b8a6","#f97316","#6366f1","#84cc16"];
+
+let structures = [
+  "Facial Nerve", "Sigmoid Sinus", "Tegmen / Dura", "Lateral SCC",
+  "Incus", "Chorda Tympani", "Jugular Bulb", "Digastric Ridge",
+].map((name, i) => ({ name, color: PALETTE[i % PALETTE.length] }));
+
+/* ---------------------------------------------------------------------
+   State.
+
+   Points are stored NORMALIZED, 0..1, relative to the image. That is what
+   the real workbench does (see normPoint in annotation-workbench.tsx), and
+   it is why the export to Label Studio is a simple multiply by 100.
+
+     POLYGON -> [[x,y], [x,y], ...]
+     RECT    -> [x, y, w, h]
+   --------------------------------------------------------------------- */
+const state = {
+  regions: [],          // committed regions
+  draft: [],            // points of the outline being drawn
+  dragRect: null,       // [x, y, w, h] while dragging a box
+  selected: null,       // index into regions
+  tool: "polygon",
+  kind: "CORRECT",
+  structure: structures[0],
+  imgW: 1200,           // natural pixel size of the loaded image
+  imgH: 800,
+  tab: "lab",
+};
+
+const $ = (id) => document.getElementById(id);
+const stage = $("stage"), photo = $("photo"), svg = $("overlay");
+
+/* =====================================================================
+   1. CONVERSION  —  the part you actually came here for
+   ===================================================================== */
+
+/**
+ * One region in the shape a row of AnnotationRegion has in the database.
+ * sortOrder is the array index; checkpointTag is denormalized in the real
+ * schema so regions stay queryable across narratives.
+ */
+function toLAByrinth(regions) {
+  return regions.map((r, i) => ({
+    structureName: r.structureName,
+    kind: r.kind,
+    errorType: r.kind === "ERROR" ? (r.errorType ?? null) : null,
+    severity: r.kind === "ERROR" ? (r.severity ?? null) : null,
+    note: r.note || null,
+    checkpointTag: "cortical-mastoidectomy",
+    shape: r.shape,
+    points: r.points,
+    color: r.color,
+    sortOrder: i,
+  }));
+}
+
+/**
+ * A Label Studio task.
+ *
+ * Two things are worth knowing here.
+ *
+ * First, Label Studio works in PERCENTAGES (0..100) of original_width and
+ * original_height, not the 0..1 fractions we store. Hence the *100.
+ *
+ * Second, these go under "predictions", not "annotations". A prediction is
+ * a starting suggestion a human refines; an annotation is a finished human
+ * label. Importing our polygons as predictions is the whole point: the
+ * instructor's rough outline becomes the seed that gets tightened into a
+ * mask, rather than being mistaken for a finished one.
+ */
+function toLabelStudio(regions, imgW, imgH) {
+  const result = regions.map((r, i) => {
+    const common = {
+      id: "reg_" + i,
+      from_name: "label",
+      to_name: "image",
+      original_width: imgW,
+      original_height: imgH,
+      image_rotation: 0,
+    };
+
+    if (r.shape === "RECT") {
+      const [x, y, w, h] = r.points;
+      return { ...common, type: "rectanglelabels", value: {
+        x: +(x * 100).toFixed(2), y: +(y * 100).toFixed(2),
+        width: +(w * 100).toFixed(2), height: +(h * 100).toFixed(2),
+        rotation: 0, rectanglelabels: [r.structureName],
+      }};
+    }
+
+    return { ...common, type: "polygonlabels", value: {
+      points: r.points.map(([x, y]) => [+(x * 100).toFixed(2), +(y * 100).toFixed(2)]),
+      closed: true, polygonlabels: [r.structureName],
+    }};
+  });
+
+  return {
+    data: { image: "/uploads/<mediaPath from the Submission row>" },
+    predictions: [{ model_version: "labyrinth-workbench", result }],
+  };
+}
+
+/** The reverse trip, for when masks come back out of Label Studio. */
+function fromLabelStudio(task) {
+  const result = task?.predictions?.[0]?.result ?? task?.annotations?.[0]?.result ?? [];
+  return result.map((r) => {
+    const name = r.value.polygonlabels?.[0] ?? r.value.rectanglelabels?.[0] ?? "Unlabelled";
+    const color = colorFor(name);
+    if (r.type === "rectanglelabels") {
+      return { structureName: name, color, kind: "CORRECT", note: null, shape: "RECT",
+               points: [r.value.x / 100, r.value.y / 100, r.value.width / 100, r.value.height / 100] };
+    }
+    return { structureName: name, color, kind: "CORRECT", note: null, shape: "POLYGON",
+             points: r.value.points.map(([x, y]) => [x / 100, y / 100]) };
+  });
+}
+
+/**
+ * The labeling config, which is how Label Studio learns what labels exist.
+ *
+ * This is the concrete version of "seed the label set from the curriculum":
+ * generate this XML from AnatomicalStructure rows and the vocabulary stays
+ * in step automatically instead of being maintained by hand in the LS UI.
+ */
+function toLabelConfig(list) {
+  const labels = list
+    .map((s) => `    <Label value="${esc(s.name)}" background="${s.color}"/>`)
+    .join("\n");
+  return `<View>
+  <Image name="image" value="$image" zoom="true" zoomControl="true"/>
+  <PolygonLabels name="label" toName="image" strokeWidth="2" pointSize="small">
+${labels}
+  </PolygonLabels>
+</View>`;
+}
+
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+const colorFor = (name) =>
+  structures.find((s) => s.name.toLowerCase() === name.toLowerCase())?.color ?? "#64748b";
+
+/* =====================================================================
+   2. GEOMETRY + RENDERING
+   ===================================================================== */
+
+/** Pointer position as a 0..1 fraction of the image box, clamped. */
+function normPoint(e) {
+  const r = stage.getBoundingClientRect();
+  return [
+    Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+    Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)),
+  ];
+}
+
+/** Rectangles can be dragged in any direction; store them top-left first. */
+function normalizeRect(x, y, w, h) {
+  return [w < 0 ? x + w : x, h < 0 ? y + h : y, Math.abs(w), Math.abs(h)];
+}
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+
+function render() {
+  const r = stage.getBoundingClientRect();
+  const W = r.width || 1, H = r.height || 1;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W);
+  svg.setAttribute("height", H);
+  svg.replaceChildren();
+
+  const px = ([x, y]) => [x * W, y * H];
+
+  state.regions.forEach((reg, i) => {
+    const on = state.selected === i;
+    const opts = { fill: reg.color, "fill-opacity": on ? 0.28 : 0.15,
+                   stroke: reg.color, "stroke-width": on ? 2.5 : 1.8,
+                   "stroke-dasharray": reg.kind === "GUIDANCE" ? "6 4" : "none" };
+
+    let shape;
+    if (reg.shape === "RECT") {
+      const [x, y, w, h] = reg.points;
+      shape = svgEl("rect", { x: x * W, y: y * H, width: w * W, height: h * H, ...opts });
+    } else {
+      shape = svgEl("polygon", { points: reg.points.map(px).map((p) => p.join(",")).join(" "), ...opts });
+    }
+    shape.style.cursor = "pointer";
+    shape.addEventListener("pointerdown", (e) => { e.stopPropagation(); select(i); });
+    svg.appendChild(shape);
+
+    // Index badge at the first vertex, matching the workbench's numbered marks.
+    const anchor = reg.shape === "RECT" ? px([reg.points[0], reg.points[1]]) : px(reg.points[0]);
+    svg.appendChild(svgEl("circle", { cx: anchor[0], cy: anchor[1], r: 9, fill: reg.color }));
+    const t = svgEl("text", { x: anchor[0], y: anchor[1] + 3.5, "text-anchor": "middle",
+                              "font-size": 10, "font-family": "system-ui", fill: "#fff" });
+    t.textContent = i + 1;
+    svg.appendChild(t);
+
+    // Editable vertices, on the selected outline only.
+    if (on && reg.shape === "POLYGON") {
+      reg.points.forEach((p, j) => {
+        const [cx, cy] = px(p);
+        const handle = svgEl("circle", { cx, cy, r: 6, fill: "#fff", stroke: reg.color, "stroke-width": 2 });
+        handle.setAttribute("class", "vert");
+        handle.addEventListener("pointerdown", (e) => {
+          e.stopPropagation();
+          startVertexDrag(i, j, e);
+        });
+        svg.appendChild(handle);
+      });
+    }
+  });
+
+  // The outline currently being drawn.
+  if (state.draft.length) {
+    const c = state.structure.color;
+    svg.appendChild(svgEl("polyline", {
+      points: state.draft.map(px).map((p) => p.join(",")).join(" "),
+      fill: "none", stroke: c, "stroke-width": 2, "stroke-dasharray": "5 4",
+    }));
+    state.draft.map(px).forEach(([cx, cy], j) =>
+      svg.appendChild(svgEl("circle", { cx, cy, r: j === 0 ? 6 : 4, fill: j === 0 ? c : "#fff",
+                                        stroke: c, "stroke-width": 2 })));
+  }
+
+  // The box currently being dragged.
+  if (state.dragRect) {
+    const [x, y, w, h] = state.dragRect;
+    svg.appendChild(svgEl("rect", { x: x * W, y: y * H, width: w * W, height: h * H,
+      fill: state.structure.color, "fill-opacity": 0.15,
+      stroke: state.structure.color, "stroke-width": 2, "stroke-dasharray": "5 4" }));
+  }
+
+  renderList();
+  renderOutput();
+  $("finish").disabled = state.draft.length < 3;
+  $("del").disabled = state.selected === null;
+}
+
+function renderList() {
+  const ul = $("list");
+  ul.replaceChildren();
+  if (!state.regions.length) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "Nothing drawn yet.";
+    ul.appendChild(li);
+    return;
+  }
+  state.regions.forEach((r, i) => {
+    const li = document.createElement("li");
+    if (state.selected === i) li.className = "sel";
+    const sw = document.createElement("span");
+    sw.className = "swatch"; sw.style.background = r.color;
+    const name = document.createElement("span");
+    name.textContent = `${i + 1}. ${r.structureName}`;
+    const kind = document.createElement("span");
+    kind.className = "kind"; kind.textContent = r.kind.toLowerCase();
+    li.append(sw, name, kind);
+    li.addEventListener("click", () => select(i));
+    ul.appendChild(li);
+  });
+}
+
+function renderOutput() {
+  const out = $("out");
+  if (state.tab === "lab") {
+    out.textContent = JSON.stringify(toLAByrinth(state.regions), null, 2);
+  } else if (state.tab === "ls") {
+    out.textContent = JSON.stringify(toLabelStudio(state.regions, state.imgW, state.imgH), null, 2);
+  } else {
+    out.textContent = toLabelConfig(structures);
+  }
+}
+
+/* =====================================================================
+   3. INTERACTION
+   ===================================================================== */
+
+function select(i) {
+  state.selected = i;
+  const note = $("note");
+  note.disabled = i === null;
+  note.value = i === null ? "" : (state.regions[i].note ?? "");
+  render();
+}
+
+function commitPolygon() {
+  if (state.draft.length < 3) return;
+  state.regions.push({
+    structureName: state.structure.name, color: state.structure.color,
+    kind: state.kind, note: null, shape: "POLYGON", points: state.draft,
+  });
+  state.draft = [];
+  select(state.regions.length - 1);
+}
+
+function startVertexDrag(regionIndex, pointIndex, downEvent) {
+  downEvent.preventDefault();
+  const move = (e) => {
+    state.regions[regionIndex].points[pointIndex] = normPoint(e);
+    render();
+  };
+  const up = () => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+
+svg.addEventListener("pointerdown", (e) => {
+  if (state.tool === "polygon") {
+    const p = normPoint(e);
+    // Clicking the first point closes the shape, same as the real workbench.
+    if (state.draft.length >= 3) {
+      const [fx, fy] = state.draft[0];
+      const r = stage.getBoundingClientRect();
+      if (Math.hypot((p[0] - fx) * r.width, (p[1] - fy) * r.height) < 12) return commitPolygon();
+    }
+    state.draft.push(p);
+    render();
+  } else {
+    const [x, y] = normPoint(e);
+    state.dragRect = [x, y, 0, 0];
+    const move = (ev) => {
+      const [cx, cy] = normPoint(ev);
+      state.dragRect = normalizeRect(x, y, cx - x, cy - y);
+      render();
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      const [rx, ry, rw, rh] = state.dragRect || [0, 0, 0, 0];
+      state.dragRect = null;
+      if (rw > 0.01 && rh > 0.01) {
+        state.regions.push({
+          structureName: state.structure.name, color: state.structure.color,
+          kind: state.kind, note: null, shape: "RECT", points: [rx, ry, rw, rh],
+        });
+        select(state.regions.length - 1);
+      } else render();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+});
+
+svg.addEventListener("dblclick", (e) => { e.preventDefault(); commitPolygon(); });
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea, select")) return;
+  if (e.key === "Enter") commitPolygon();
+  if (e.key === "Escape") { state.draft = []; render(); }
+  if ((e.key === "Backspace" || e.key === "Delete") && state.selected !== null) {
+    state.regions.splice(state.selected, 1);
+    select(null);
+  }
+});
+
+/* ---- toolbar ---- */
+$("tool-poly").onclick = () => setTool("polygon");
+$("tool-rect").onclick = () => setTool("rect");
+function setTool(t) {
+  state.tool = t; state.draft = []; state.dragRect = null;
+  $("tool-poly").classList.toggle("on", t === "polygon");
+  $("tool-rect").classList.toggle("on", t === "rect");
+  render();
+}
+
+$("finish").onclick = commitPolygon;
+$("undo").onclick = () => { state.draft.pop(); render(); };
+$("del").onclick = () => {
+  if (state.selected === null) return;
+  state.regions.splice(state.selected, 1);
+  select(null);
+};
+$("clear").onclick = () => { state.regions = []; state.draft = []; select(null); };
+
+/* ---- label controls ---- */
+function fillStructures() {
+  const sel = $("structure");
+  sel.replaceChildren();
+  structures.forEach((s) => {
+    const o = document.createElement("option");
+    o.value = s.name;
+    o.textContent = s.name;
+    sel.appendChild(o);
+  });
+  sel.value = state.structure.name;
+}
+$("structure").onchange = (e) => {
+  state.structure = structures.find((s) => s.name === e.target.value);
+};
+$("addstruct").onclick = () => {
+  const name = $("newstruct").value.trim();
+  if (!name) return;
+  if (!structures.some((s) => s.name.toLowerCase() === name.toLowerCase())) {
+    structures.push({ name, color: PALETTE[structures.length % PALETTE.length] });
+  }
+  $("newstruct").value = "";
+  state.structure = structures.find((s) => s.name.toLowerCase() === name.toLowerCase());
+  fillStructures();
+  render();
+};
+document.querySelectorAll(".kindbtn").forEach((b) => {
+  b.onclick = () => {
+    state.kind = b.dataset.kind;
+    document.querySelectorAll(".kindbtn").forEach((x) => x.classList.toggle("on", x === b));
+  };
+});
+$("note").oninput = (e) => {
+  if (state.selected === null) return;
+  state.regions[state.selected].note = e.target.value || null;
+  renderOutput();
+};
+
+/* ---- output panel ---- */
+document.querySelectorAll(".tabs button").forEach((b) => {
+  b.onclick = () => {
+    state.tab = b.dataset.tab;
+    document.querySelectorAll(".tabs button").forEach((x) => x.classList.toggle("on", x === b));
+    renderOutput();
+  };
+});
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText($("out").textContent); say("Copied", true); }
+  catch { say("Copy blocked by the browser; select the text instead"); }
+};
+$("import").onclick = () => {
+  const raw = prompt("Paste an array of LAByrinth regions, or a full Label Studio task:");
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    const incoming = Array.isArray(parsed) ? parsed : fromLabelStudio(parsed);
+    state.regions = incoming.map((r) => ({
+      structureName: r.structureName ?? "Unlabelled",
+      color: r.color ?? colorFor(r.structureName ?? ""),
+      kind: r.kind ?? "CORRECT",
+      note: r.note ?? null,
+      shape: r.shape ?? "POLYGON",
+      points: r.points,
+    }));
+    select(null);
+    say(`Loaded ${state.regions.length} region(s)`, true);
+  } catch (err) {
+    say("Could not parse that: " + err.message);
+  }
+};
+let msgTimer;
+function say(text, ok) {
+  const m = $("msg");
+  m.textContent = text;
+  m.classList.toggle("saidok", !!ok);
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { m.textContent = ""; }, 3000);
+}
+
+/* ---- image loading ---- */
+$("file").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  photo.onload = () => {
+    state.imgW = photo.naturalWidth;
+    state.imgH = photo.naturalHeight;
+    render();
+    say(`Loaded ${state.imgW}×${state.imgH}`, true);
+  };
+  photo.src = url;
+};
+
+/**
+ * A stand-in specimen so the page is usable the moment it opens. Drawn in
+ * code rather than shipped as a file, to keep this to a single document.
+ * Load a real dissection photo over it with the button.
+ */
+function placeholder() {
+  const c = document.createElement("canvas");
+  c.width = 1200; c.height = 800;
+  const g = c.getContext("2d");
+  const bg = g.createLinearGradient(0, 0, 1200, 800);
+  bg.addColorStop(0, "#d9cfbd"); bg.addColorStop(1, "#b9ab95");
+  g.fillStyle = bg; g.fillRect(0, 0, 1200, 800);
+  const blobs = [[430,380,250,190,"#8d7f69"],[470,360,150,110,"#6d6152"],
+                 [820,300,120,150,"#c3b7a2"],[300,560,170,90,"#a2937c"]];
+  for (const [x, y, rx, ry, fill] of blobs) {
+    g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+    g.fillStyle = fill; g.fill();
+  }
+  g.fillStyle = "rgba(40,35,30,0.5)";
+  g.font = "22px system-ui";
+  g.fillText("placeholder specimen — load a real photo", 40, 760);
+  return c.toDataURL();
+}
+
+photo.src = placeholder();
+photo.onload = () => { state.imgW = 1200; state.imgH = 800; render(); };
+fillStructures();
+new ResizeObserver(render).observe(stage);
+render();
+</script>
+</body>
+</html>
